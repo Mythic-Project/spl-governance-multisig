@@ -1,0 +1,23 @@
+{
+  "name": "spl-governance-multisig",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsup"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@solana/spl-token": "^0.4.8",
+    "@solana/web3.js": "^1.95.1",
+    "bn.js": "^5.2.1",
+    "governance-idl-sdk": "^0.0.2"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.5",
+    "tsup": "^8.2.3"
+  }
+}

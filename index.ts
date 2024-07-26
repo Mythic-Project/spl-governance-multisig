@@ -51,6 +51,7 @@ export class MultiSig {
    * 
    * @param threshold The minimum signers needed to execute the proposal
    * @param signers All members of the multisig
+   * @param name (Optional) A unique name for your multisig
    * @param voteDuration (Optional) The duration of the proposal in seconds. Defaults to 86400 sec (1 day)
    * 
    * @returns {txSignature} Signature of the transaction
@@ -61,6 +62,7 @@ export class MultiSig {
   async createMultisig(
     threshold: number,
     signers: PublicKey[],
+    name?: string,
     voteDuration?: number
   ) : Promise<CreateMultisigReturnType> {
     if (threshold > signers.length) throw new Error("The threshold exceeds the signers' count.")
@@ -78,7 +80,7 @@ export class MultiSig {
     // The instruction Set
     const ixs: TransactionInstruction[] = []
 
-    const realmName = `Multisig ${Date.now()} ${Math.floor(Math.random() * 100000)}`;
+    const realmName = name ?? `Multisig ${Date.now()} ${Math.floor(Math.random() * 100000)}`;
     const realmId = this.splGovernance.pda.realmAccount({name: realmName}).publicKey;
     const governanceId = this.splGovernance.pda.governanceAccount({realmAccount: realmId, seed: realmId}).publicKey;
     const nativeTreasuryId = this.splGovernance.pda.nativeTreasuryAccount({governanceAccount: governanceId}).publicKey;
@@ -132,7 +134,7 @@ export class MultiSig {
       councilVetoVoteThreshold: { disabled: {} },
       // Anybody from the multisig can propose transactions
       minCouncilWeightToCreateProposal: 1,
-      councilVoteTipping: { strict: {} },
+      councilVoteTipping: { early: {} },
       communityVetoVoteThreshold: { disabled: {} },
       votingCoolOffTime: 0,
       depositExemptProposalCount: 254,
@@ -280,6 +282,7 @@ export class MultiSig {
    * @param multiSigKey The public key of the multisig (ID)
    * @param title Title of the propoal
    * @param instructions The internal instructions to execute in the transaction
+   * @param skipApprove (Optional) create transaction without approving it
    * 
    * 
    * @returns {txSignature} Signature of the transaction
@@ -288,7 +291,8 @@ export class MultiSig {
   async createTransaction(
     multiSigKey: PublicKey,
     title: string,
-    instructions: TransactionInstruction[]
+    instructions: TransactionInstruction[],
+    skipApprove?: boolean
   ): Promise<CreateTransactionReturnType> {
     // The instruction Set
     const ixs: TransactionInstruction[] = []
@@ -350,21 +354,25 @@ export class MultiSig {
       tokenOwnerRecordKey
     )
 
-    const castVoteIx = await this.splGovernance.castVoteInstruction(
-      {approve: [[{rank: 0, weightPercentage: 100}]]},
-      multiSigKey,
-      governanceId,
-      proposalId,
-      tokenOwnerRecordKey,
-      tokenOwnerRecordKey,
-      this.payer.publicKey,
-      councilMint,
-      this.payer.publicKey
+    ixs.push(
+      createProposalIx, insertTxIx, signOffProposalIx
     )
 
-    ixs.push(
-      createProposalIx, insertTxIx, signOffProposalIx, castVoteIx
-    )
+    if (!skipApprove) {
+      const castVoteIx = await this.splGovernance.castVoteInstruction(
+        {approve: [[{rank: 0, weightPercentage: 100}]]},
+        multiSigKey,
+        governanceId,
+        proposalId,
+        tokenOwnerRecordKey,
+        tokenOwnerRecordKey,
+        this.payer.publicKey,
+        councilMint,
+        this.payer.publicKey
+      )
+
+      ixs.push(castVoteIx)
+    }
 
     const sig = await this.createAndConfirmTransaction(ixs)
 
